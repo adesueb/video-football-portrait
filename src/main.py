@@ -66,10 +66,10 @@ if __name__ == '__main__':
 
     video_output_tracker = "result/tracker.mp4"
     video_result = "result/result.mp4"
-    video_input_path = "videos/football.mp4"
+    video_input_path = "videos/sample_football.mp4"
 
     # model_default = YOLO('model/yolov8m-football.pt')
-    model_default = YOLO('model/yolo_l.pt')
+    model_default = YOLO('model/yolo_l2.pt')
     cap = cv2.VideoCapture(video_input_path)
 
     frame_sequence = 1
