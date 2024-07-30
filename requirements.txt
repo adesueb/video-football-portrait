@@ -1,0 +1,13 @@
+tensorflow[and-cuda]
+opencv-python==4.10.0.84
+pandas==2.2.2
+tensorflow-hub
+google-cloud-storage==2.14.0
+fsspec==2023.12.2
+gcsfs==2023.12.2.post1
+matplotlib==3.9
+tensorflow-io==0.37.0
+scenedetect[opencv]
+ffmpeg==1.4
+deepface
+ultralytics==8.0.215
