@@ -2,6 +2,7 @@ import cv2
 from ultralytics import YOLO
 
 from definitions import object_white_listed
+from video_muxer import extract_audio, combine_audio_video
 
 
 def draw_bounding_box(location, img, color):
@@ -63,10 +64,13 @@ def compare_histograms(frame1, frame2):
 
 if __name__ == '__main__':
 
+    video_output_tracker = "result/tracker.mp4"
+    video_result = "result/result.mp4"
+    video_input_path = "videos/football.mp4"
+
     # model_default = YOLO('model/yolov8m-football.pt')
     model_default = YOLO('model/yolo_l.pt')
-    video_path = "videos/football.mp4"
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(video_input_path)
 
     frame_sequence = 1
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -76,7 +80,7 @@ if __name__ == '__main__':
 
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    moving = 30
+    moving = 40
     moving_to_center = 60
     desired_aspect_ratio = 2 / 3
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -85,16 +89,14 @@ if __name__ == '__main__':
     x_start = int(max(0, ((width / 2) - (new_width / 2))))
 
     size = (int(new_width), int(height))
-    result = cv2.VideoWriter('filename.avi',
-                             cv2.VideoWriter_fourcc(*'XVID'),
+    result = cv2.VideoWriter(video_output_tracker,
+                             cv2.VideoWriter_fourcc(*'mp4v'),
                              fps, size)
 
     max_x = width-new_width
     prev_frame = None
 
     while success and frame_number <= frame_count:
-        frame_number += frame_sequence
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
         success, frame = cap.read()
         if success:
             balls = custom_checking_default(frame, frame, model_default)
@@ -140,4 +142,8 @@ if __name__ == '__main__':
     cap.release()
     result.release()
     cv2.destroyAllWindows()
+
+    output_audio_path = 'result/extracted_audio.mp3'
+    extract_audio(video_input_path, output_audio_path)
+    combine_audio_video(video_output_tracker, output_audio_path, video_result)
 
