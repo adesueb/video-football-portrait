@@ -4,6 +4,10 @@ from ultralytics import YOLO
 from definitions import object_white_listed
 from video_muxer import extract_audio, combine_audio_video
 
+video_output_tracker = "result/tracker.mp4"
+video_result = "result/result.mp4"
+audio_output_path = 'result/extracted_audio.mp3'
+
 
 def draw_bounding_box(location, img, color):
     x = location[0]
@@ -61,41 +65,28 @@ def compare_histograms(frame1, frame2):
     return score
 
 
-
-if __name__ == '__main__':
-
-    video_output_tracker = "result/tracker.mp4"
-    video_result = "result/result.mp4"
-    video_input_path = "videos/sample_football.mp4"
-
+def proceed(video_input_path, width, height):
     # model_default = YOLO('model/yolov8m-football.pt')
     model_default = YOLO('model/yolo_l2.pt')
     cap = cv2.VideoCapture(video_input_path)
-
-    frame_sequence = 1
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     frame_number = 0
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
     success, image = cap.read()
-
     fps = cap.get(cv2.CAP_PROP_FPS)
-
     moving = 40
-    moving_to_center = 60
-    desired_aspect_ratio = 2 / 3
+    moving_to_center = 80
+    desired_aspect_ratio = width / height
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
     new_width = height * desired_aspect_ratio
     x_start = int(max(0, ((width / 2) - (new_width / 2))))
-
     size = (int(new_width), int(height))
     result = cv2.VideoWriter(video_output_tracker,
                              cv2.VideoWriter_fourcc(*'mp4v'),
                              fps, size)
-
-    max_x = width-new_width
+    max_x = width - new_width
     prev_frame = None
-
     while success and frame_number <= frame_count:
         success, frame = cap.read()
         if success:
@@ -120,7 +111,7 @@ if __name__ == '__main__':
                 else:
                     x_start = x_start_temp
             else:
-                x_start_temp = (width/2) - (new_width / 2)
+                x_start_temp = (width / 2) - (new_width / 2)
                 x_start = x_start - ((x_start - x_start_temp) / moving_to_center)
 
             y_start = (height - height) // 2
@@ -133,17 +124,16 @@ if __name__ == '__main__':
 
             result.write(frame)
             cv2.imshow("Vidio AI", frame)
-
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
         else:
             break
-
     cap.release()
     result.release()
     cv2.destroyAllWindows()
+    extract_audio(video_input_path, audio_output_path)
+    combine_audio_video(video_output_tracker, audio_output_path, video_result)
 
-    output_audio_path = 'result/extracted_audio.mp3'
-    extract_audio(video_input_path, output_audio_path)
-    combine_audio_video(video_output_tracker, output_audio_path, video_result)
 
+if __name__ == '__main__':
+    proceed(video_input_path="videos/sample_football.mp4", width=2, height=3)
