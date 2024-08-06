@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const resultContainer = document.getElementById('result-container');
     const resultPreview = document.getElementById('result-preview');
     let videoClips = [];
+    let activeTrimContainer = null;
 
     // Hide result container initially
     resultContainer.style.display = 'none';
@@ -27,6 +28,7 @@ document.addEventListener("DOMContentLoaded", function() {
             removeButton.addEventListener('click', function() {
                 timelineVideoContainer.remove();
                 videoClips = videoClips.filter(clip => clip.filename !== filename);
+                updateThumbnailPositions();
             });
 
             timelineVideoContainer.appendChild(loadingPlaceholder);
@@ -47,21 +49,90 @@ document.addEventListener("DOMContentLoaded", function() {
                 const clip = { filename, url: videoUrl, start: 0, end: duration, duration: duration };
                 videoClips.push(clip);
 
-                // Add slider for trimming
-                const slider = document.createElement('input');
-                slider.type = 'range';
-                slider.min = 0;
-                slider.max = duration;
-                slider.value = duration;
-                slider.className = 'trim-slider';
+                // Create custom range slider for trimming
+                const trimContainer = document.createElement('div');
+                trimContainer.className = 'trim-container';
 
-                timelineVideoContainer.appendChild(slider);
+                const startHandle = document.createElement('div');
+                startHandle.className = 'trim-handle start-handle';
 
-                slider.addEventListener('input', function() {
-                    const endValue = parseInt(slider.value, 10);
-                    clip.end = endValue;
-                    timelineImage.style.width = `${endValue * 10}px`; // Adjust width based on trim
+                const endHandle = document.createElement('div');
+                endHandle.className = 'trim-handle end-handle';
+
+                trimContainer.appendChild(startHandle);
+                trimContainer.appendChild(endHandle);
+                timelineVideoContainer.appendChild(trimContainer);
+
+                let isDraggingStart = false;
+                let isDraggingEnd = false;
+                let isDragging = false;
+
+                // Hide trim handles initially
+                trimContainer.style.display = 'none';
+
+                timelineImage.addEventListener('click', (event) => {
+                    if (!isDragging) {
+                        event.stopPropagation();
+                        if (trimContainer.style.display === 'none') {
+                            if (activeTrimContainer) {
+                                activeTrimContainer.style.display = 'none';
+                                sortable.option('disabled', false);  // Enable drag-and-drop reorder
+                            }
+                            trimContainer.style.display = 'flex';
+                            const newWidth = (clip.end - clip.start) * 10;
+                            startHandle.style.left = `0px`;
+                            endHandle.style.left = `${newWidth - endHandle.offsetWidth}px`; // Adjust to end exactly at the image
+                            activeTrimContainer = trimContainer;
+                            sortable.option('disabled', true);  // Disable drag-and-drop reorder
+                        } else {
+                            trimContainer.style.display = 'none';
+                            activeTrimContainer = null;
+                            sortable.option('disabled', false);  // Enable drag-and-drop reorder
+                        }
+                    }
                 });
+
+                startHandle.addEventListener('mousedown', (event) => {
+                    event.stopPropagation();
+                    isDraggingStart = true;
+                    isDragging = false;
+                });
+
+                endHandle.addEventListener('mousedown', (event) => {
+                    event.stopPropagation();
+                    isDraggingEnd = true;
+                    isDragging = false;
+                });
+
+                document.addEventListener('mousemove', (event) => {
+                    if (isDraggingStart || isDraggingEnd) {
+                        isDragging = true;
+                    }
+                    if (isDraggingStart) {
+                        const newStart = Math.max(0, Math.min(event.clientX - timelineVideoContainer.offsetLeft, clip.end * 10));
+                        clip.start = newStart / 10;
+                        const newWidth = (clip.end - clip.start) * 10;
+                        timelineImage.style.width = `${newWidth}px`;
+                        trimContainer.style.width = `${newWidth}px`;
+                        startHandle.style.left = `0px`;
+                        endHandle.style.left = `${newWidth - endHandle.offsetWidth}px`; // Adjust to end exactly at the image
+                    } else if (isDraggingEnd) {
+                        const newEnd = Math.min(clip.duration * 10, Math.max(event.clientX - timelineVideoContainer.offsetLeft, clip.start * 10));
+                        clip.end = newEnd / 10;
+                        const newWidth = (clip.end - clip.start) * 10;
+                        timelineImage.style.width = `${newWidth}px`;
+                        trimContainer.style.width = `${newWidth}px`;
+                        endHandle.style.left = `${newWidth - endHandle.offsetWidth}px`; // Adjust to end exactly at the image
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    isDraggingStart = false;
+                    isDraggingEnd = false;
+                    isDragging = false;
+                });
+
+                updateThumbnailPositions();
 
             } catch (error) {
                 console.error('Error generating thumbnail:', error);
@@ -72,13 +143,14 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // Initialize SortableJS
-    new Sortable(document.getElementById('clips'), {
+    const sortable = new Sortable(document.getElementById('clips'), {
         animation: 150,
         onEnd: function() {
             videoClips = Array.from(document.getElementById('clips').querySelectorAll('.timeline-video-container')).map(container => {
                 const img = container.querySelector('img');
                 return videoClips.find(clip => clip.filename === img.getAttribute('data-filename'));
             });
+            updateThumbnailPositions();  // Update positions after reorder
         }
     });
 
@@ -137,6 +209,29 @@ document.addEventListener("DOMContentLoaded", function() {
                 resolve(video.duration);
             });
             video.addEventListener('error', (e) => reject(e));
+        });
+    }
+
+    document.addEventListener('click', (event) => {
+        if (activeTrimContainer && !activeTrimContainer.contains(event.target)) {
+            activeTrimContainer.style.display = 'none';
+            activeTrimContainer = null;
+            sortable.option('disabled', false);  // Enable drag-and-drop reorder
+        }
+    });
+
+    function updateThumbnailPositions() {
+        const thumbnails = document.querySelectorAll('.timeline-video-container img');
+        thumbnails.forEach((thumbnail, index) => {
+            const clip = videoClips[index];
+            const startOffset = clip.start * 10;
+            const endOffset = clip.end * 10;
+            const width = endOffset - startOffset;
+            thumbnail.style.width = `${width}px`;
+            const trimContainer = thumbnail.parentElement.querySelector('.trim-container');
+            trimContainer.style.width = `${width}px`;
+            const endHandle = trimContainer.querySelector('.end-handle');
+            endHandle.style.left = `${width - endHandle.offsetWidth}px`; // Adjust to end exactly at the image
         });
     }
 });

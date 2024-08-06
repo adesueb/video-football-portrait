@@ -45,6 +45,35 @@ body {
     cursor: pointer;
     border: 2px solid #ccc;
     border-radius: 5px;
+    clip-path: inset(0 0 0 0);
+}
+
+#clips .trim-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+}
+
+#clips .trim-handle {
+    position: absolute;
+    width: 10px;
+    height: 100%;
+    background-color: rgba(0, 0, 255, 0.5);
+    cursor: ew-resize;
+    pointer-events: all;
+}
+
+#clips .start-handle {
+    left: 0;
+}
+
+#clips .end-handle {
+    right: 0;
 }
 
 #clips .remove-button {
@@ -61,11 +90,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.trim-slider {
-    width: 80%;
-    margin-top: 10px;
 }
 
 .loading-placeholder {
