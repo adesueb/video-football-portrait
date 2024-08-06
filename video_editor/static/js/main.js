@@ -17,8 +17,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
             const timelineVideoContainer = document.createElement('div');
             timelineVideoContainer.className = 'timeline-video-container';
+
             const loadingPlaceholder = document.createElement('div');
             loadingPlaceholder.className = 'loading-placeholder';
+
             const removeButton = document.createElement('button');
             removeButton.className = 'remove-button';
             removeButton.innerText = 'X';
@@ -34,13 +36,33 @@ document.addEventListener("DOMContentLoaded", function() {
             try {
                 if (!ffmpeg.isLoaded()) await ffmpeg.load();
                 const thumbnail = await generateThumbnail(videoUrl);
+                const duration = await getVideoDuration(videoUrl);
 
                 const timelineImage = document.createElement('img');
                 timelineImage.setAttribute('src', thumbnail);
                 timelineImage.setAttribute('data-filename', filename);
+                timelineImage.style.width = `${duration * 10}px`; // Adjust width based on video length
                 loadingPlaceholder.replaceWith(timelineImage);
 
-                videoClips.push({ filename, url: videoUrl });
+                const clip = { filename, url: videoUrl, start: 0, end: duration, duration: duration };
+                videoClips.push(clip);
+
+                // Add slider for trimming
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.min = 0;
+                slider.max = duration;
+                slider.value = duration;
+                slider.className = 'trim-slider';
+
+                timelineVideoContainer.appendChild(slider);
+
+                slider.addEventListener('input', function() {
+                    const endValue = parseInt(slider.value, 10);
+                    clip.end = endValue;
+                    timelineImage.style.width = `${endValue * 10}px`; // Adjust width based on trim
+                });
+
             } catch (error) {
                 console.error('Error generating thumbnail:', error);
                 alert('Error generating thumbnail: ' + error.message);
@@ -53,8 +75,9 @@ document.addEventListener("DOMContentLoaded", function() {
     new Sortable(document.getElementById('clips'), {
         animation: 150,
         onEnd: function() {
-            videoClips = Array.from(document.getElementById('clips').querySelectorAll('img')).map(img => {
-                return { filename: img.getAttribute('data-filename'), url: img.getAttribute('src') };
+            videoClips = Array.from(document.getElementById('clips').querySelectorAll('.timeline-video-container')).map(container => {
+                const img = container.querySelector('img');
+                return videoClips.find(clip => clip.filename === img.getAttribute('data-filename'));
             });
         }
     });
@@ -68,14 +91,15 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             if (!ffmpeg.isLoaded()) await ffmpeg.load();
 
-            // Load each video clip into ffmpeg
+            // Trim each video clip according to the start and end times
             for (let i = 0; i < videoClips.length; i++) {
                 const videoData = await fetchFile(videoClips[i].url);
                 ffmpeg.FS('writeFile', `input${i}.mp4`, videoData);
+                await ffmpeg.run('-i', `input${i}.mp4`, '-ss', videoClips[i].start.toString(), '-to', videoClips[i].end.toString(), '-c', 'copy', `trimmed${i}.mp4`);
             }
 
             // Create a text file for ffmpeg to concatenate the videos
-            const fileList = videoClips.map((clip, index) => `file 'input${index}.mp4'`).join('\n');
+            const fileList = videoClips.map((clip, index) => `file 'trimmed${index}.mp4'`).join('\n');
             ffmpeg.FS('writeFile', 'fileList.txt', new TextEncoder().encode(fileList));
 
             // Run the ffmpeg command to concatenate videos
@@ -103,5 +127,16 @@ document.addEventListener("DOMContentLoaded", function() {
 
         const blob = new Blob([data.buffer], { type: 'image/jpeg' });
         return URL.createObjectURL(blob);
+    }
+
+    async function getVideoDuration(videoUrl) {
+        return new Promise((resolve, reject) => {
+            const video = document.createElement('video');
+            video.src = videoUrl;
+            video.addEventListener('loadedmetadata', () => {
+                resolve(video.duration);
+            });
+            video.addEventListener('error', (e) => reject(e));
+        });
     }
 });
