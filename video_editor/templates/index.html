@@ -1,18 +1,15 @@
 <!doctype html>
 <html lang="en">
-  <head>
+<head>
+    <meta charset="UTF-8">
     <title>Video Editor</title>
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
-    <div class="container">
-      <h1 class="my-4 text-center">Welcome to the Video Editor</h1>
-      <div class="text-center">
-        <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload Videos</a>
-      </div>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container text-center">
+        <h1 class="mt-5">Welcome to the Video Editor</h1>
+        <a href="{{ url_for('upload') }}" class="btn btn-primary mt-3">Upload Videos</a>
     </div>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
-  </body>
+</body>
 </html>

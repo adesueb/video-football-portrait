@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="en">
-  <head>
+<head>
+    <meta charset="UTF-8">
     <title>Upload Videos</title>
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
-  </head>
-  <body>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
     <div class="container">
-      <h1 class="my-4">Upload Videos</h1>
-      <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
-        <div class="form-group">
-          <label for="file">Select Videos</label>
-          <input type="file" class="form-control-file" name="file" id="file" multiple>
-        </div>
-        <button type="submit" class="btn btn-primary">Upload</button>
-      </form>
+        <h1 class="mt-5">Upload Videos</h1>
+        <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <input type="file" name="file" class="form-control-file" multiple>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
     </div>
-  </body>
+</body>
 </html>

@@ -1,115 +1,36 @@
 <!doctype html>
 <html lang="en">
-  <head>
+<head>
+    <meta charset="UTF-8">
     <title>Edit Videos</title>
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <style>
-      .scene-container, .timeline-container {
-        position: relative;
-        padding: 20px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        background-color: #f8f9fa;
-      }
-      .scene-list, .timeline {
-        display: flex;
-        flex-direction: row;
-        overflow-x: auto;
-        padding: 10px;
-        white-space: nowrap;
-        height: auto;
-        margin-bottom: 20px;
-      }
-      .clip, .scene-item {
-        margin: 0 10px;
-        padding: 10px;
-        background-color: #ffffff;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
-        width: 120px; /* Adjust width as needed */
-        flex-shrink: 0;
-      }
-      .clip:hover, .scene-item:hover {
-        background-color: #f0f0f0;
-        border-color: #007bff;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      }
-      .video-preview {
-        width: 100%;
-        height: 100px;
-        object-fit: cover;
-      }
-      .slider-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 10px;
-      }
-      input[type="range"] {
-        width: 100%;
-      }
-      .value-display {
-        margin-left: 10px;
-      }
-      .result-container {
-        text-align: center;
-        margin-top: 20px;
-      }
-      #result-video {
-        width: 80%;
-        max-width: 600px;
-      }
-    </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="container">
-      <h1 class="my-4 text-center">Video Editor</h1>
-      <div class="row">
-        <div class="col-md-12">
-          <h3 class="text-center">Available Scenes</h3>
-          <div class="scene-container">
-            <ul id="available-scenes" class="scene-list list-group">
-              <!-- Scenes will be added here -->
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-md-12">
-          <h3 class="text-center">Timeline</h3>
-          <div class="timeline-container">
-            <div id="timeline" class="timeline">
-              <!-- Clips will be added here -->
+        <h1 class="mt-5">Edit Videos</h1>
+        <div id="video-list" class="d-flex flex-wrap mb-4">
+            {% for filename in filenames %}
+            <div class="video-item card m-2" data-filename="{{ filename }}">
+                <video class="card-img-top" src="{{ url_for('uploaded_file', filename=filename) }}" controls></video>
+                <div class="card-body">
+                    <button class="btn btn-secondary add-to-timeline">Add to Timeline</button>
+                </div>
             </div>
-          </div>
+            {% endfor %}
         </div>
-      </div>
-      <div class="text-center">
-        <button id="save-edits" class="btn btn-success">Save Edits</button>
-      </div>
-
-      <!-- Placeholder for the result video -->
-      <div class="row mt-4 result-container" id="result-container" style="display: none;">
-        <div class="col-md-12">
-          <h3>Result Video</h3>
-          <video controls id="result-video">
-            <source id="result-video-source" type="video/mp4">
-            Your browser does not support the video tag.
-          </video>
+        <div id="timeline" class="mb-4">
+            <h2>Timeline</h2>
+            <div id="clips" class="d-flex flex-wrap"></div>
         </div>
-      </div>
+        <button id="merge-button" class="btn btn-success">Merge Videos</button>
+        <div id="result-container" class="mt-4">
+            <h2>Result</h2>
+            <video id="result-preview" class="w-100" controls></video>
+        </div>
     </div>
-    <script>
-      const filenames = {{ filenames | tojson }};
-    </script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-  </body>
+</body>
 </html>

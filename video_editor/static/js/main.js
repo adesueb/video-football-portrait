@@ -1,224 +1,107 @@
-document.addEventListener('DOMContentLoaded', () => {
-  const clipList = document.getElementById('timeline');
-  const availableScenes = document.getElementById('available-scenes');
-  const saveEditsButton = document.getElementById('save-edits');
-  const resultContainer = document.getElementById('result-container');
-  const resultVideo = document.getElementById('result-video');
-  const resultVideoSource = document.getElementById('result-video-source');
+document.addEventListener("DOMContentLoaded", function() {
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    const ffmpeg = createFFmpeg({ log: true });
+    const resultContainer = document.getElementById('result-container');
+    const resultPreview = document.getElementById('result-preview');
+    let videoClips = [];
 
-  // Function to create a new scene element
-  function createSceneElement(filename) {
-    const sceneLi = document.createElement('li');
-    sceneLi.classList.add('list-group-item', 'scene-item');
-    sceneLi.setAttribute('draggable', 'true');
+    // Hide result container initially
+    resultContainer.style.display = 'none';
 
-    const videoContainer = document.createElement('div');
-    videoContainer.classList.add('video-container');
-    const videoPreview = document.createElement('video');
-    videoPreview.controls = false;
-    videoPreview.classList.add('video-preview');
-    const source = document.createElement('source');
-    source.src = `/static/uploads/${filename}`;
-    source.type = 'video/mp4';
-    videoPreview.appendChild(source);
+    document.querySelectorAll('.add-to-timeline').forEach(button => {
+        button.addEventListener('click', async function() {
+            const videoItem = this.closest('.video-item');
+            const filename = videoItem.getAttribute('data-filename');
+            const videoSrc = videoItem.querySelector('video').getAttribute('src');
+            const videoUrl = new URL(videoSrc, window.location.origin).href;
 
-    const filenameInput = document.createElement('input');
-    filenameInput.setAttribute('type', 'hidden');
-    filenameInput.setAttribute('name', 'filename');
-    filenameInput.setAttribute('value', filename);
+            const timelineVideoContainer = document.createElement('div');
+            timelineVideoContainer.className = 'timeline-video-container';
+            const loadingPlaceholder = document.createElement('div');
+            loadingPlaceholder.className = 'loading-placeholder';
+            const removeButton = document.createElement('button');
+            removeButton.className = 'remove-button';
+            removeButton.innerText = 'X';
+            removeButton.addEventListener('click', function() {
+                timelineVideoContainer.remove();
+                videoClips = videoClips.filter(clip => clip.filename !== filename);
+            });
 
-    const addButton = document.createElement('button');
-    addButton.innerText = 'Add';
-    addButton.classList.add('btn', 'btn-primary', 'btn-sm', 'mt-2');
-    addButton.addEventListener('click', () => {
-      createClipElement(filename);
+            timelineVideoContainer.appendChild(loadingPlaceholder);
+            timelineVideoContainer.appendChild(removeButton);
+            document.getElementById('clips').appendChild(timelineVideoContainer);
+
+            try {
+                if (!ffmpeg.isLoaded()) await ffmpeg.load();
+                const thumbnail = await generateThumbnail(videoUrl);
+
+                const timelineImage = document.createElement('img');
+                timelineImage.setAttribute('src', thumbnail);
+                timelineImage.setAttribute('data-filename', filename);
+                loadingPlaceholder.replaceWith(timelineImage);
+
+                videoClips.push({ filename, url: videoUrl });
+            } catch (error) {
+                console.error('Error generating thumbnail:', error);
+                alert('Error generating thumbnail: ' + error.message);
+                loadingPlaceholder.remove();
+            }
+        });
     });
 
-    sceneLi.appendChild(videoContainer);
-    videoContainer.appendChild(videoPreview);
-    sceneLi.appendChild(filenameInput);
-    sceneLi.appendChild(addButton);
-
-    availableScenes.appendChild(sceneLi);
-
-    videoPreview.addEventListener('loadedmetadata', () => {
-      sceneLi.style.width = (videoPreview.duration * 10) + 'px'; // Adjust the multiplier as needed
+    // Initialize SortableJS
+    new Sortable(document.getElementById('clips'), {
+        animation: 150,
+        onEnd: function() {
+            videoClips = Array.from(document.getElementById('clips').querySelectorAll('img')).map(img => {
+                return { filename: img.getAttribute('data-filename'), url: img.getAttribute('src') };
+            });
+        }
     });
 
-    videoPreview.addEventListener('error', () => {
-      console.error(`Error loading video: ${filename}`);
-      alert(`Error loading video: ${filename}`);
-    });
-  }
+    document.getElementById('merge-button').addEventListener('click', async function() {
+        if (videoClips.length < 2) {
+            alert('Please add at least two video clips to merge.');
+            return;
+        }
 
-  // Function to create a new clip element
-  function createClipElement(filename) {
-    const clipDiv = document.createElement('div');
-    clipDiv.classList.add('clip');
-    clipDiv.setAttribute('draggable', 'true');
+        try {
+            if (!ffmpeg.isLoaded()) await ffmpeg.load();
 
-    const videoContainer = document.createElement('div');
-    videoContainer.classList.add('video-container');
-    const videoPreview = document.createElement('video');
-    videoPreview.controls = false;
-    videoPreview.classList.add('video-preview');
-    const source = document.createElement('source');
-    source.src = `/static/uploads/${filename}`;
-    source.type = 'video/mp4';
-    videoPreview.appendChild(source);
+            // Load each video clip into ffmpeg
+            for (let i = 0; i < videoClips.length; i++) {
+                const videoData = await fetchFile(videoClips[i].url);
+                ffmpeg.FS('writeFile', `input${i}.mp4`, videoData);
+            }
 
-    const filenameInput = document.createElement('input');
-    filenameInput.setAttribute('type', 'hidden');
-    filenameInput.setAttribute('name', 'filename');
-    filenameInput.setAttribute('value', filename);
+            // Create a text file for ffmpeg to concatenate the videos
+            const fileList = videoClips.map((clip, index) => `file 'input${index}.mp4'`).join('\n');
+            ffmpeg.FS('writeFile', 'fileList.txt', new TextEncoder().encode(fileList));
 
-    const startLabel = document.createElement('label');
-    startLabel.innerText = 'Start time:';
+            // Run the ffmpeg command to concatenate videos
+            await ffmpeg.run('-f', 'concat', '-safe', '0', '-i', 'fileList.txt', '-c', 'copy', 'output.mp4');
+            const data = ffmpeg.FS('readFile', 'output.mp4');
 
-    const startInput = document.createElement('input');
-    startInput.setAttribute('type', 'range');
-    startInput.setAttribute('name', 'start');
-    startInput.setAttribute('min', '0');
-    startInput.setAttribute('step', '0.1');
-    startInput.setAttribute('value', '0');
-    startInput.classList.add('slider');
-    startInput.addEventListener('input', () => updateVideoPreview(startInput, endInput, videoPreview));
+            // Create a URL for the merged video
+            const mergedVideoBlob = new Blob([data.buffer], { type: 'video/mp4' });
+            const mergedVideoUrl = URL.createObjectURL(mergedVideoBlob);
 
-    const endLabel = document.createElement('label');
-    endLabel.innerText = 'End time:';
-
-    const endInput = document.createElement('input');
-    endInput.setAttribute('type', 'range');
-    endInput.setAttribute('name', 'end');
-    endInput.setAttribute('min', '0');
-    endInput.setAttribute('step', '0.1');
-    endInput.setAttribute('value', '10'); // Default value, should be updated based on video duration
-    endInput.classList.add('slider');
-    endInput.addEventListener('input', () => updateVideoPreview(startInput, endInput, videoPreview));
-
-    const startValue = document.createElement('span');
-    startValue.innerText = startInput.value;
-    startValue.classList.add('value-display');
-
-    const endValue = document.createElement('span');
-    endValue.innerText = endInput.value;
-    endValue.classList.add('value-display');
-
-    startInput.addEventListener('input', () => {
-      startValue.innerText = startInput.value;
+            // Show result container and preview the merged video
+            resultContainer.style.display = 'block';
+            resultPreview.setAttribute('src', mergedVideoUrl);
+        } catch (error) {
+            console.error('Error merging videos:', error);
+            alert('Error merging videos: ' + error.message);
+        }
     });
 
-    endInput.addEventListener('input', () => {
-      endValue.innerText = endInput.value;
-    });
+    async function generateThumbnail(videoUrl) {
+        const videoData = await fetchFile(videoUrl);
+        ffmpeg.FS('writeFile', 'input.mp4', videoData);
+        await ffmpeg.run('-i', 'input.mp4', '-ss', '00:00:01.000', '-vframes', '1', 'thumbnail.jpg');
+        const data = ffmpeg.FS('readFile', 'thumbnail.jpg');
 
-    const removeButton = document.createElement('button');
-    removeButton.innerText = 'Remove';
-    removeButton.classList.add('btn', 'btn-danger', 'btn-sm', 'mt-2');
-    removeButton.addEventListener('click', () => {
-      clipDiv.remove();
-    });
-
-    const sliderContainer = document.createElement('div');
-    sliderContainer.classList.add('slider-container');
-
-    sliderContainer.appendChild(startLabel);
-    sliderContainer.appendChild(startInput);
-    sliderContainer.appendChild(startValue);
-    sliderContainer.appendChild(endLabel);
-    sliderContainer.appendChild(endInput);
-    sliderContainer.appendChild(endValue);
-
-    clipDiv.appendChild(videoContainer);
-    videoContainer.appendChild(videoPreview);
-    clipDiv.appendChild(filenameInput);
-    clipDiv.appendChild(sliderContainer);
-    clipDiv.appendChild(removeButton);
-
-    clipList.appendChild(clipDiv);
-
-    // Update the maximum value for the sliders based on the video duration
-    videoPreview.addEventListener('loadedmetadata', () => {
-      startInput.setAttribute('max', videoPreview.duration);
-      endInput.setAttribute('max', videoPreview.duration);
-      endInput.setAttribute('value', videoPreview.duration);
-      endValue.innerText = videoPreview.duration;
-      clipDiv.style.width = (videoPreview.duration * 10) + 'px'; // Adjust the multiplier as needed
-    });
-
-    videoPreview.addEventListener('error', () => {
-      console.error(`Error loading video: ${filename}`);
-      alert(`Error loading video: ${filename}`);
-    });
-
-    // Add hover effect
-    clipDiv.addEventListener('mouseenter', () => {
-      clipDiv.classList.add('highlight');
-    });
-
-    clipDiv.addEventListener('mouseleave', () => {
-      clipDiv.classList.remove('highlight');
-    });
-  }
-
-  // Function to update video preview based on slider values
-  function updateVideoPreview(startInput, endInput, videoPreview) {
-    const startTime = parseFloat(startInput.value);
-    const endTime = parseFloat(endInput.value);
-    videoPreview.currentTime = startTime;
-    videoPreview.play();
-
-    const timeUpdateHandler = () => {
-      if (videoPreview.currentTime >= endTime) {
-        videoPreview.pause();
-        videoPreview.removeEventListener('timeupdate', timeUpdateHandler);
-      }
-    };
-
-    videoPreview.addEventListener('timeupdate', timeUpdateHandler);
-  }
-
-  // Add scene elements for each uploaded video
-  filenames.forEach(filename => {
-    createSceneElement(filename);
-  });
-
-  // Enable jQuery UI sortable for drag-and-drop functionality
-  $("#available-scenes, #timeline").sortable({
-    connectWith: ".list-group",
-    helper: "clone",
-    stop: function(event, ui) {
-      if (ui.item.parent().attr('id') === 'timeline') {
-        createClipElement(ui.item.find("input[name='filename']").val());
-        ui.item.remove();
-      }
+        const blob = new Blob([data.buffer], { type: 'image/jpeg' });
+        return URL.createObjectURL(blob);
     }
-  }).disableSelection();
-
-  // Save edits button click handler
-  saveEditsButton.addEventListener('click', () => {
-    const clips = [];
-    const clipElements = clipList.getElementsByClassName('clip');
-    for (let clipElement of clipElements) {
-      const filename = clipElement.querySelector("input[name='filename']").value;
-      const start = clipElement.querySelector("input[name='start']").value;
-      const end = clipElement.querySelector("input[name='end']").value;
-      clips.push({ filename, start, end });
-    }
-
-    $.ajax({
-      url: '/edit_ajax',
-      method: 'POST',
-      contentType: 'application/json',
-      data: JSON.stringify({ clips }),
-      success: function(response) {
-        resultVideoSource.src = `/static/edited/${response.result_video}`;
-        resultVideo.load();
-        resultContainer.style.display = 'block';
-      },
-      error: function(xhr, status, error) {
-        alert('Error saving edits: ' + error);
-      }
-    });
-  });
 });
